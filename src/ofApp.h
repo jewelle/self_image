@@ -28,12 +28,17 @@ class ofApp : public ofBaseApp{
     int posX, posY, posZ;
     int stepSize, YstepSize;
     int counter; // for timing scrolling boxes
-    string person; // entry name. must match a folder
+    string person; // entry name
     ofDirectory dir; // object for reading folder contents
     float spinX, spinY;
     vector <float> noiseSeeds; // noise for box movement
     bool name, camReset, labels, bigBox, boxStack, boxPop; // modes
     ofEasyCam easycam;
     ofLight pointLight, pointLight2, pointLight3;
-
+    ofImage img;
+    string contentURL;
+    int croppedDim, height, width;
+    string keyword;
+    string workingDir, newDir, finalDir, fileType;
+    
 };
