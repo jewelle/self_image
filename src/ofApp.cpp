@@ -22,7 +22,7 @@ using Poco::RegularExpression;
 void ofApp::setup(){
     
     // Opening alert for all users.
-    ofSystemAlertDialog("Welcome to SELF/IMAGE.\n\nPlease enter your name in the next text box, followed by ad preference keywords gathered from:\n\nfacebook.com/ads/preferences/edit\n\nThis application will then display Facebook's aggregated image of you based on things it thinks you like.\n\nMove around by dragging the display and use the top keys on your keyboard to switch between viewing modes [ q-w-e-r-t-y-u-i ].\n\nThis version of the program gathers images from the search engine DuckDuckGo.");
+    ofSystemAlertDialog("Welcome to SELF/IMAGE.\n\nPlease enter your name in the next text box, followed by ad preference keywords gathered from:\n\nfacebook.com/ads/preferences/edit\n\nThis application will then display Facebook's aggregated image of you based on targeted advertising data.\n\nMove around by dragging the display and use keys to switch between viewing modes.");
     
     // - - - - - Setting up context - - - - - //
     ofDisableArbTex(); // Use GL_TEXTURE_2D textures. If removed, the images will be replaced by single colors.
@@ -37,6 +37,8 @@ void ofApp::setup(){
     posZ = 400;
     
     counter = 0;
+    normal = true;
+    words = true;
     
     // - - - - - Entry system - - - - - //
     // Ask the user to enter their name.
@@ -48,69 +50,70 @@ void ofApp::setup(){
         // Create new folder with person's name
         workingDir = dir.getAbsolutePath();
         newDir = workingDir + "/../../../data/" + person;
+        cout << newDir << endl;
         ofDirectory newfolder(newDir);
         newfolder.create();
         while (keyword != "x"  || keyword != "X"){
-        keyword = ofSystemTextBoxDialog("Enter keyword or type X to stop", keyword);
+            keyword = ofSystemTextBoxDialog("Enter keyword or type X to stop", keyword);
             if (keyword == "x" || keyword == "X"){
                 break;
             }
-        cout << person << endl;
-        cout << keyword << endl;
-        
-        // Input keywords into image search api URLs.
-        string URL = "http://api.duckduckgo.com/?q=" + keyword + "&format=xml&pretty=1";
-        
-        // Load information retrieved from URL (XML file) into openFrameworks.
-        ofHttpResponse resp = ofLoadURL(URL);
-        
-        // Turn the response into text.
-        string rawData = resp.data.getText();
-        
-        // Parse the retrieved data to find the first image URL by matching the <Icon> tag with a regular expression.
-        RegularExpression search("<Icon>(.+?)</Icon>");
-        RegularExpression::Match matchimgURL;
-        
-        // Determine whether a match was found.
-        int imgURLfound = search.match(rawData, matchimgURL);
-        
-        // If a match was found, get the image file URL from the <Icon> tag.
-        if (imgURLfound == 2){
-            string imgURL = rawData.substr(matchimgURL.offset, matchimgURL.length);
-            string contentFirst = ofSplitString(imgURL, ">") [1];
-            contentURL = ofSplitString(contentFirst, "<") [0];
-            cout << contentURL << endl; // YES!!!
-            // get the image type - .png / .jpg / .jpeg
-            vector <string> split = ofSplitString(contentURL, "."); // Search for the front part of the URL.
-            cout << split.size() << endl;
-            fileType = split[2];
-            cout << fileType << endl;
-            // Load the image from the URL into the image variable.
-            img.load(contentURL);
-            // Check the height & width of the image and use whichever is smaller to crop a square.
-            width = img.getWidth();
-            height = img.getHeight();
-            if (width >= height){
-                croppedDim = height;
+            cout << person << endl;
+            cout << keyword << endl;
+            
+            // Input keywords into image search api URLs.
+            string URL = "http://api.duckduckgo.com/?q=" + keyword + "&format=xml&pretty=1";
+            
+            // Load information retrieved from URL (XML file) into openFrameworks.
+            ofHttpResponse resp = ofLoadURL(URL);
+            
+            // Turn the response into text.
+            string rawData = resp.data.getText();
+            
+            // Parse the retrieved data to find the first image URL by matching the <Icon> tag with a regular expression.
+            RegularExpression search("<Icon>(.+?)</Icon>");
+            RegularExpression::Match matchimgURL;
+            
+            // Determine whether a match was found.
+            int imgURLfound = search.match(rawData, matchimgURL);
+            
+            // If a match was found, get the image file URL from the <Icon> tag.
+            if (imgURLfound == 2){
+                string imgURL = rawData.substr(matchimgURL.offset, matchimgURL.length);
+                string contentFirst = ofSplitString(imgURL, ">") [1];
+                contentURL = ofSplitString(contentFirst, "<") [0];
+                cout << contentURL << endl; // YES!!!
+                // get the image type - .png / .jpg / .jpeg
+                vector <string> split = ofSplitString(contentURL, "."); // Search for the front part of the URL.
+                cout << split.size() << endl;
+                fileType = split[2];
+                cout << fileType << endl;
+                // Load the image from the URL into the image variable.
+                img.load(contentURL);
+                // Check the height & width of the image and use whichever is smaller to crop a square.
+                width = img.getWidth();
+                height = img.getHeight();
+                if (width >= height){
+                    croppedDim = height;
+                }
+                if (height >= width){
+                    croppedDim = width;
+                }
+                if (croppedDim > 60){
+                    croppedDim = croppedDim - 50;
+                }
+                img.crop(0, 0, croppedDim, croppedDim);
+                cout << croppedDim << endl;
+                
+                // Save the image in the /bin folder and use the keyword as the filename.
+                img.save(newDir + "/" + keyword + "." + fileType, OF_IMAGE_QUALITY_BEST);
             }
-            if (height >= width){
-                croppedDim = width;
+            
+            // If no match was found, write "not found" to the console.
+            if (imgURLfound == 0){
+                cout << "not found" << endl;
+                ofSystemAlertDialog("The keyword was not found on DuckDuckGo.");
             }
-            if (croppedDim > 60){
-                croppedDim = croppedDim - 50;
-            }
-            img.crop(0, 0, croppedDim, croppedDim);
-            cout << croppedDim << endl;
-
-            // Save the image in the /bin folder and use the keyword as the filename.
-            img.save(newDir + "/" + keyword + "." + fileType, OF_IMAGE_QUALITY_BEST);
-        }
-        
-        // If no match was found, write "not found" to the console.
-        if (imgURLfound == 0){
-            cout << "not found" << endl;
-            ofSystemAlertDialog("The keyword was not found on DuckDuckGo.");
-        }
         }
     }
     
@@ -120,70 +123,70 @@ void ofApp::setup(){
         cout << "already exists" << endl;
         workingDir = dir.getAbsolutePath();
         newDir = workingDir + "/../../../data/" + person;
+        cout << newDir << endl;
         while (keyword != "x" || keyword != "X"){
             keyword = ofSystemTextBoxDialog("Enter more keywords or type X to stop", keyword);
             if (keyword == "x" || keyword == "X"){
                 break;
             }
-        // Input keywords into image search api URLs.
-        string URL = "http://api.duckduckgo.com/?q=" + keyword + "&format=xml&pretty=1";
-        
-        // Load information retrieved from URL (XML file) into openFrameworks.
-        ofHttpResponse resp = ofLoadURL(URL);
-        
-        // Turn the response into text.
-        string rawData = resp.data.getText();
-        
-        // Parse the retrieved data to find the first image URL by matching the <Icon> tag with a regular expression.
-        RegularExpression search("<Icon>(.+?)</Icon>");
-        RegularExpression::Match matchimgURL;
-        
-        // Determine whether a match was found.
-        int imgURLfound = search.match(rawData, matchimgURL);
+            // Input keywords into image search api URLs.
+            string URL = "http://api.duckduckgo.com/?q=" + keyword + "&format=xml&pretty=1";
+            
+            // Load information retrieved from URL (XML file) into openFrameworks.
+            ofHttpResponse resp = ofLoadURL(URL);
+            
+            // Turn the response into text.
+            string rawData = resp.data.getText();
+            
+            // Parse the retrieved data to find the first image URL by matching the <Icon> tag with a regular expression.
+            RegularExpression search("<Icon>(.+?)</Icon>");
+            RegularExpression::Match matchimgURL;
+            
+            // Determine whether a match was found.
+            int imgURLfound = search.match(rawData, matchimgURL);
             cout << imgURLfound << endl;
-        // If a match was found, get the image file URL from the <Icon> tag.
-        if (imgURLfound == 2){
-            // separate the URL from the <Icon> tag
-            string imgURL = rawData.substr(matchimgURL.offset, matchimgURL.length);
-            string contentFirst = ofSplitString(imgURL, ">") [1];
-            contentURL = ofSplitString(contentFirst, "<") [0];
-            cout << contentURL << endl; // YES!!!
-            // get the image type - .png / .jpg / .jpeg
-            vector <string> split = ofSplitString(contentURL, "."); // Search for the front part of the URL.
-            cout << split.size() << endl;
-            fileType = split[2];
-            cout << fileType << endl;
-            // Load the image from the URL into the image variable.
-            img.load(contentURL);
-            // Check the height & width of the image and use whichever is smaller to crop a square.
-            width = img.getWidth();
-            height = img.getHeight();
-            if (width >= height){
-                croppedDim = height;
+            // If a match was found, get the image file URL from the <Icon> tag.
+            if (imgURLfound == 2){
+                // separate the URL from the <Icon> tag
+                string imgURL = rawData.substr(matchimgURL.offset, matchimgURL.length);
+                string contentFirst = ofSplitString(imgURL, ">") [1];
+                contentURL = ofSplitString(contentFirst, "<") [0];
+                cout << contentURL << endl; // YES!!!
+                // get the image type - .png / .jpg / .jpeg
+                vector <string> split = ofSplitString(contentURL, "."); // Search for the front part of the URL.
+                cout << split.size() << endl;
+                fileType = split[2];
+                cout << fileType << endl;
+                // Load the image from the URL into the image variable.
+                img.load(contentURL);
+                // Check the height & width of the image and use whichever is smaller to crop a square.
+                width = img.getWidth();
+                height = img.getHeight();
+                if (width >= height){
+                    croppedDim = height;
+                }
+                if (height >= width){
+                    croppedDim = width;
+                }
+                if (croppedDim > 60){
+                    croppedDim = croppedDim - 50;
+                }
+                img.crop(0, 0, croppedDim, croppedDim);
+                cout << croppedDim << endl;
+                
+                // Save the image in the /bin folder and use the keyword as the filename.
+                img.save(newDir + "/" + keyword + "." + fileType, OF_IMAGE_QUALITY_BEST); // Change to relevant filetype.
             }
-            if (height >= width){
-                croppedDim = width;
-            }
-            if (croppedDim > 60){
-            croppedDim = croppedDim - 50;
-            }
-            img.crop(0, 0, croppedDim, croppedDim);
-            cout << croppedDim << endl;
             
-            // Save the image in the /bin folder and use the keyword as the filename.
-            img.save(newDir + "/" + keyword + "." + fileType, OF_IMAGE_QUALITY_BEST); // Change to relevant filetype.
-            
-        }
-        
-        // If no match was found, write "not found" to the console.
-        if (imgURLfound == 0){
-            cout << "not found" << endl;
-            ofSystemAlertDialog("The keyword was not found on DuckDuckGo.");
-        }
+            // If no match was found, write "not found" to the console.
+            if (imgURLfound == 0){
+                cout << "not found" << endl;
+                ofSystemAlertDialog("The keyword was not found on DuckDuckGo.");
+            }
         }
     }
     
-// Prepare the same number of boxes as there are keywords in the name folder.
+    // Prepare the same number of boxes as there are keywords in the name folder.
     nImages = dir.listDir(person);
     nBoxes = nImages;
     images.resize(nImages);
@@ -203,10 +206,10 @@ void ofApp::setup(){
 
 //--------------------------------------------------------------
 void ofApp::update(){
-
+    
     counter++; // Adding a value every update for scrolling label box function.
     
-// - - - - - Set lighting points - - - - - //
+    // - - - - - Set lighting points - - - - - //
     pointLight.setPosition(ofGetWidth()/2, ofGetHeight()/2, 1500);
     pointLight2.setPosition(ofGetWidth(), ofGetHeight(), 1500);
 }
@@ -216,6 +219,15 @@ void ofApp::draw(){
     
     ofSetColor(255);
     ofDrawBitmapString(person, 6*(ofGetWidth()/7), ofGetHeight()/8, 0); // User's name in top right corner.
+    
+    
+    // Instructions in a bottom section of the screen.
+    if ( words == true) {
+        ofDrawBitmapString("Drag the mouse to move around the space and use CTRL to zoom", ofGetWidth()/9, (ofGetHeight()-88), 0);
+        ofDrawBitmapString("Change viewing modes with keys Q, W, E, and R", ofGetWidth()/9, (ofGetHeight()-72), 0);
+        ofDrawBitmapString("Reset the camera with Z and press X to change users", ofGetWidth()/9, (ofGetHeight()-55), 0);
+        ofDrawBitmapString("Press C to hide or show this text", ofGetWidth()/9, (ofGetHeight()-38), 0);
+    }
     
     ofEnableDepthTest(); // Renders graphics objects with respect to their z-coordinates.
     
@@ -227,18 +239,18 @@ void ofApp::draw(){
     spinY = cos(ofGetElapsedTimef()*.075f);
     
     easycam.begin(); // Camera for exploring the scene with the mouse.
-
+    
     ofSetColor(255, 255, 255);
-
+    
     stepSize = boxSize*1.5; // How far apart each box is from its neighbor.
     YstepSize = boxSize*0.5; // Distance between rows.
-
-// - - - - - Reset camera view - - - - - //
+    
+    // - - - - - Reset camera view - - - - - //
     if (camReset == true){
         easycam.reset();
         camReset = false;
     }
-// - - - - - Box stack popping - - - - - //
+    // - - - - - Box stack popping - - - - - //
     if (boxStack == true){
         easycam.begin();
         for ( int i = 0; i < nBoxes; i++){
@@ -257,7 +269,7 @@ void ofApp::draw(){
         }
         easycam.end();
     }
-// - - - - - Intense noisey popping - - - - - //
+    // - - - - - Intense noisey popping - - - - - //
     else if (boxPop == true){
         easycam.begin();
         for ( int i = 0; i < nBoxes; i++){
@@ -276,7 +288,7 @@ void ofApp::draw(){
         }
         easycam.end();
     }
-// - - - - - Flashing big box - - - - - //
+    // - - - - - Flashing big box - - - - - //
     else if (bigBox == true){
         easycam.begin();
         for ( int i = 0; i < nBoxes; i++){
@@ -292,7 +304,7 @@ void ofApp::draw(){
         }
         easycam.end();
     }
-// - - - - - Label view - - - - - //
+    // - - - - - Label view - - - - - //
     else if (labels == true){
         easycam.end();
         for ( int i = 0; i < nBoxes; i++){
@@ -316,8 +328,8 @@ void ofApp::draw(){
         }
         easycam.begin();
     }
-// - - - - - Original view - - - - - //
-    else {
+    // - - - - - Original view - - - - - //
+    else if (normal == true){
         easycam.begin();
         for ( int i = 0; i < nBoxes; i++){
             boxes[i].set(boxSize);
@@ -344,17 +356,171 @@ void ofApp::draw(){
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
     
-// - - - - - Press n to change person being visualised - - - - - //
-    if (key == 'n'){
+    // - - - - - Press x to change person being visualised - - - - - //
     
+    
+    if (key == 'x'){
+        
+        boxSize = 200;
+        posX = - ofGetWidth();
+        posY = - 1.2*ofGetHeight(); // Bottom box starting position.
+        posZ = 400;
+        
+        counter = 0;
+        boxStack = false;
+        boxPop = false;
+        labels = false;
+        bigBox = false;
+        normal = true;
+        
+        // Ask the user to enter their name.
         person = ofSystemTextBoxDialog("Enter name", person);
         
-        if (dir.listDir(person) == 0){ // If there's no folder with that name, ask again.
-            person = ofSystemTextBoxDialog("Enter name", person);
+        // NEW USER - If there is not already a folder with that name, proceed to gather preference keywords.
+        if (dir.doesDirectoryExist(person) == 0){
+            cout << "new person" << endl;
+            // Create new folder with person's name
+            workingDir = dir.getAbsolutePath();
+            newDir = workingDir + "/../../data/" + person;
+            ofDirectory newfolder(newDir);
+            newfolder.create();
+            while (keyword != "x"  || keyword != "X"){
+                keyword = ofSystemTextBoxDialog("Enter keyword or type X to stop", keyword);
+                if (keyword == "x" || keyword == "X"){
+                    break;
+                }
+                cout << person << endl;
+                cout << keyword << endl;
+                
+                // Input keywords into image search api URLs.
+                string URL = "http://api.duckduckgo.com/?q=" + keyword + "&format=xml&pretty=1";
+                
+                // Load information retrieved from URL (XML file) into openFrameworks.
+                ofHttpResponse resp = ofLoadURL(URL);
+                
+                // Turn the response into text.
+                string rawData = resp.data.getText();
+                
+                // Parse the retrieved data to find the first image URL by matching the <Icon> tag with a regular expression.
+                RegularExpression search("<Icon>(.+?)</Icon>");
+                RegularExpression::Match matchimgURL;
+                
+                // Determine whether a match was found.
+                int imgURLfound = search.match(rawData, matchimgURL);
+                
+                // If a match was found, get the image file URL from the <Icon> tag.
+                if (imgURLfound == 2){
+                    string imgURL = rawData.substr(matchimgURL.offset, matchimgURL.length);
+                    string contentFirst = ofSplitString(imgURL, ">") [1];
+                    contentURL = ofSplitString(contentFirst, "<") [0];
+                    cout << contentURL << endl; // YES!!!
+                    // get the image type - .png / .jpg / .jpeg
+                    vector <string> split = ofSplitString(contentURL, "."); // Search for the front part of the URL.
+                    cout << split.size() << endl;
+                    fileType = split[2];
+                    cout << fileType << endl;
+                    // Load the image from the URL into the image variable.
+                    img.load(contentURL);
+                    // Check the height & width of the image and use whichever is smaller to crop a square.
+                    width = img.getWidth();
+                    height = img.getHeight();
+                    if (width >= height){
+                        croppedDim = height;
+                    }
+                    if (height >= width){
+                        croppedDim = width;
+                    }
+                    if (croppedDim > 60){
+                        croppedDim = croppedDim - 50;
+                    }
+                    img.crop(0, 0, croppedDim, croppedDim);
+                    cout << croppedDim << endl;
+                    
+                    // Save the image in the /bin folder and use the keyword as the filename.
+                    img.save(newDir + "/" + keyword + "." + fileType, OF_IMAGE_QUALITY_BEST);
+                }
+                
+                // If no match was found, write "not found" to the console.
+                if (imgURLfound == 0){
+                    cout << "not found" << endl;
+                    ofSystemAlertDialog("The keyword was not found on DuckDuckGo.");
+                }
+            }
         }
-        nImages = dir.listDir(person); // Number of files in the folder bin/data/___.
+        
+        
+        // OLD USER - If a folder with the name already exists, ask whether new keywords should be added.
+        else if (dir.doesDirectoryExist(person) == 1){
+            cout << "already exists" << endl;
+            workingDir = dir.getAbsolutePath();
+            newDir = workingDir + "/../../data/" + person;
+            while (keyword != "x" || keyword != "X"){
+                keyword = ofSystemTextBoxDialog("Enter more keywords or type X to stop", keyword);
+                if (keyword == "x" || keyword == "X"){
+                    break;
+                }
+                // Input keywords into image search api URLs.
+                string URL = "http://api.duckduckgo.com/?q=" + keyword + "&format=xml&pretty=1";
+                
+                // Load information retrieved from URL (XML file) into openFrameworks.
+                ofHttpResponse resp = ofLoadURL(URL);
+                
+                // Turn the response into text.
+                string rawData = resp.data.getText();
+                
+                // Parse the retrieved data to find the first image URL by matching the <Icon> tag with a regular expression.
+                RegularExpression search("<Icon>(.+?)</Icon>");
+                RegularExpression::Match matchimgURL;
+                
+                // Determine whether a match was found.
+                int imgURLfound = search.match(rawData, matchimgURL);
+                cout << imgURLfound << endl;
+                // If a match was found, get the image file URL from the <Icon> tag.
+                if (imgURLfound == 2){
+                    // separate the URL from the <Icon> tag
+                    string imgURL = rawData.substr(matchimgURL.offset, matchimgURL.length);
+                    string contentFirst = ofSplitString(imgURL, ">") [1];
+                    contentURL = ofSplitString(contentFirst, "<") [0];
+                    cout << contentURL << endl; // YES!!!
+                    // get the image type - .png / .jpg / .jpeg
+                    vector <string> split = ofSplitString(contentURL, "."); // Search for the front part of the URL.
+                    cout << split.size() << endl;
+                    fileType = split[2];
+                    cout << fileType << endl;
+                    // Load the image from the URL into the image variable.
+                    img.load(contentURL);
+                    // Check the height & width of the image and use whichever is smaller to crop a square.
+                    width = img.getWidth();
+                    height = img.getHeight();
+                    if (width >= height){
+                        croppedDim = height;
+                    }
+                    if (height >= width){
+                        croppedDim = width;
+                    }
+                    if (croppedDim > 60){
+                        croppedDim = croppedDim - 50;
+                    }
+                    img.crop(0, 0, croppedDim, croppedDim);
+                    cout << croppedDim << endl;
+                    
+                    // Save the image in the /bin folder and use the keyword as the filename.
+                    img.save(newDir + "/" + keyword + "." + fileType, OF_IMAGE_QUALITY_BEST); // Change to relevant filetype.
+                    
+                }
+                
+                // If no match was found, write "not found" to the console.
+                if (imgURLfound == 0){
+                    cout << "not found" << endl;
+                    ofSystemAlertDialog("The keyword was not found on DuckDuckGo.");
+                }
+            }
+        }
+        
+        // Prepare the same number of boxes as there are keywords in the name folder.
+        nImages = dir.listDir(person);
         nBoxes = nImages;
-        images.resize(nImages); // Resize the vectors according to how many photos there are in the folder.
+        images.resize(nImages);
         boxes.resize(nBoxes);
         filenames.resize(nBoxes);
         
@@ -363,87 +529,101 @@ void ofApp::keyPressed(int key){
             images[i].load(fileName);
             filenames[i] = fileName;
         }
+        
         for (int j = 0; j < nBoxes; j++){
             noiseSeeds.push_back(ofRandom(0, 10000));
         }
     }
-
-// - - - - - q = one box with flashing layers of other box on top, w = go back - - - - - - //
-    if (key == 'q')
-        bigBox = true;
-    if (key == 'w')
-        bigBox = false;
     
-// - - - - - e = box popping, r = go back - - - - - - //
-    if (key == 'e')
-        boxStack = true;
-    if (key == 'r')
+    // - - - - - q = one box with flashing layers of other box on top - - - - - - //
+    if (key == 'q'){
         boxStack = false;
-
-// - - - - - t = box popping, y = go back - - - - - - //
-    if (key == 't')
-        boxPop = true;
-    if (key == 'y')
         boxPop = false;
-
-// - - - - - u = names list, i = go back - - - - - - //
-    if (key == 'u')
-        labels = true;
-        counter = 0;
-    if (key == 'i')
         labels = false;
-
-// - - - - - o = reset camera - - - - - //
-    if (key == 'o')
+        bigBox = true;
+    }
+    // - - - - - w = box stack - - - - - - //
+    if (key == 'w'){
+        bigBox = false;
+        boxPop = false;
+        labels = false;
+        boxStack = true;
+    }
+    
+    // - - - - - e = box popping - - - - - - //
+    if (key == 'e'){
+        bigBox = false;
+        boxStack = false;
+        labels = false;
+        boxPop = true;
+    }
+    
+    // - - - - - r = names list - - - - - - //
+    if (key == 'r'){
+        counter = 0;
+        bigBox = false;
+        boxStack = false;
+        boxPop = false;
+        labels = true;
+    }
+    
+    // - - - - - z = reset camera - - - - - //
+    if (key == 'z')
         camReset = true;
+    
+    
+    // - - - - - c = show or hide text - - - - - //
+    
+    if (key == 'c')
+        words = !words;
 }
 
 //--------------------------------------------------------------
 void ofApp::keyReleased(int key){
-
+    
 }
 
 //--------------------------------------------------------------
 void ofApp::mouseMoved(int x, int y ){
-
+    
 }
 
 //--------------------------------------------------------------
 void ofApp::mouseDragged(int x, int y, int button){
-
+    
 }
 
 //--------------------------------------------------------------
 void ofApp::mousePressed(int x, int y, int button){
-
+    
 }
 
 //--------------------------------------------------------------
 void ofApp::mouseReleased(int x, int y, int button){
-
+    
 }
 
 //--------------------------------------------------------------
 void ofApp::mouseEntered(int x, int y){
-
+    
 }
 
 //--------------------------------------------------------------
 void ofApp::mouseExited(int x, int y){
-
+    
 }
 
 //--------------------------------------------------------------
 void ofApp::windowResized(int w, int h){
-
+    
 }
 
 //--------------------------------------------------------------
 void ofApp::gotMessage(ofMessage msg){
-
+    
 }
 
 //--------------------------------------------------------------
 void ofApp::dragEvent(ofDragInfo dragInfo){ 
-
+    
 }
